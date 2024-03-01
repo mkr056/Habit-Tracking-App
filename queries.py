@@ -15,3 +15,11 @@ create = f'''
     '''
 
 insert = 'INSERT INTO Habit (title, periodicity) VALUES (?, ?)'
+
+check = '''
+    UPDATE Habit SET completion_dates = COALESCE(completion_dates || '\n', '') || datetime('now') WHERE id = ?
+'''
+
+delete = 'DELETE FROM Habit WHERE id = ?'
+
+get_ids = 'SELECT id FROM Habit'
