@@ -22,4 +22,6 @@ check = '''
 
 delete = 'DELETE FROM Habit WHERE id = ?'
 
-get_ids = 'SELECT id FROM Habit'
+update = 'UPDATE Habit SET title = COALESCE(?, title), periodicity = COALESCE(?, periodicity) WHERE id = ?;'
+
+get_habits = 'SELECT * FROM Habit'
