@@ -1,5 +1,5 @@
 import sqlite3
-import json
+import json, os, signal
 # import logging
 from flask import Flask, request, jsonify
 from flask_json_schema import JsonSchema, JsonValidationError
@@ -31,10 +31,13 @@ def prompt_user():
     cursor.execute(queries.create_trigger)
     connection.commit()
     connection.close()
-    command = input("Enter a command (create/check/update/delete/info/exit): ")
-    prepared_command = helpers.prepare_string(command)
-    command_handler = commands.get(prepared_command, handle_invalid_input)
-    command_handler()
+    while True:
+        command = input("Enter a command (create/check/update/delete/info/exit): ")
+        prepared_command = helpers.prepare_string(command)
+        command_handler = commands.get(prepared_command, handle_invalid_input)
+        command_handler()
+        if prepared_command == 'exit':
+            break
     return jsonify({'success': True}), 200
 
 
@@ -113,6 +116,11 @@ def get_longest_streak():
     return jsonify({'longest_streak': longest_streak}), 200
 
 
+def handle_exit():
+    os.kill(os.getpid(), signal.SIGINT)
+    print("Application has been terminated.")
+
+
 def handle_invalid_input():
     print("Invalid command.")
     return prompt_user()
@@ -123,7 +131,8 @@ commands = {
     'update': update_habit,
     'delete': delete_habit,
     'check': check_habit,
-    'info': get_habit_info
+    'info': get_habit_info,
+    'exit': handle_exit
 }
 
 if __name__ == '__main__':
