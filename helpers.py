@@ -1,5 +1,6 @@
 import requests
-from config import URL, periodicities
+from config import URL
+from common import periodicities
 
 
 def prepare_string(string):
@@ -49,7 +50,7 @@ def get_id():
         return int(habit_id)
 
 
-def get_habits():
-    response = requests.get(f'{URL}/habits')
+def get_habits(periodicity='all'):
+    response = requests.get(f'{URL}/habits?periodicity={periodicity}')
     data = response.json()
     return data.get('habits')

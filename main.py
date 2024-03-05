@@ -4,11 +4,13 @@ import json
 from flask import Flask, request, jsonify
 from flask_json_schema import JsonSchema, JsonValidationError
 import helpers
-from create import create_habit
-from update import update_habit
-from check import check_habit
-from delete import delete_habit
+from commands.create import create_habit
+from commands.update import update_habit
+from commands.check import check_habit
+from commands.delete import delete_habit
+from commands.info import get_habit_info
 from config import *
+from common import create_schema, update_schema
 import queries
 
 app = Flask(__name__)
@@ -26,6 +28,7 @@ def prompt_user():
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
     cursor.execute(queries.create)
+    cursor.execute(queries.create_trigger)
     connection.commit()
     connection.close()
     command = input("Enter a command (create/check/update/delete/info/exit): ")
@@ -46,6 +49,7 @@ def create():
     connection.commit()
     connection.close()
     return jsonify({'success': True}), 200
+
 
 @app.route('/<habit_id>/update', methods=['POST'])
 @schema.validate(update_schema)
@@ -82,13 +86,31 @@ def check(habit_id):
 
 @app.route('/habits', methods=['GET'])
 def get_habits():
+    periodicity = request.args.get('periodicity')
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
-    cursor.execute(queries.get_habits)
+    cursor.execute(queries.validate_streak)
+    cursor.execute(queries.get_habits, [periodicity, periodicity])
     habits = cursor.fetchall()
     connection.commit()
     connection.close()
     return jsonify({'habits': habits}), 200
+
+
+@app.route('/streak', methods=['GET'])
+def get_longest_streak():
+    habit_id = request.args.get('id')
+    connection = sqlite3.connect(DB_NAME)
+    cursor = connection.cursor()
+    cursor.execute(queries.validate_streak)
+    if habit_id:
+        cursor.execute(queries.get_longest_streak_id, habit_id)
+    else:
+        cursor.execute(queries.get_longest_streak_all)
+    longest_streak = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    return jsonify({'longest_streak': longest_streak}), 200
 
 
 def handle_invalid_input():
@@ -101,6 +123,7 @@ commands = {
     'update': update_habit,
     'delete': delete_habit,
     'check': check_habit,
+    'info': get_habit_info
 }
 
 if __name__ == '__main__':

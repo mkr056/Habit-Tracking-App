@@ -1,7 +1,8 @@
 import json
 import requests
 import helpers
-from config import periodicities, URL, Habit
+from config import URL
+from common import Habit
 
 
 def create_habit():

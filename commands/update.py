@@ -1,4 +1,5 @@
-from config import update_properties, Habit, URL
+from config import URL
+from common import update_properties, Habit
 import helpers
 import json
 import requests
