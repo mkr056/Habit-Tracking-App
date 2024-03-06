@@ -17,6 +17,15 @@ create = f'''
 
 insert = 'INSERT INTO Habit (title, periodicity) VALUES (?, ?)'
 
+insert_predefined_habits = '''
+    INSERT INTO Habit (title, periodicity) VALUES 
+    ('test1', 'hourly'), 
+    ('test2', 'daily'), 
+    ('test3', 'weekly'),
+    ('test4', 'hourly'),
+    ('test5', 'daily')
+'''
+
 check = '''
     UPDATE Habit SET completion_dates = COALESCE(completion_dates || '\n', '') || datetime('now'), current_streak = CASE
         WHEN periodicity = 'hourly' AND (strftime('%s', 'now') - strftime('%s', latest_completion) <= 3600 OR latest_completion IS NULL) THEN current_streak + 1
