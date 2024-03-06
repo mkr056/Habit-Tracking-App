@@ -1,5 +1,5 @@
 ### Installation instructions:
-1. Clone this repository
+1. Clone this repository: navigate to desired directory and run **git clone https://github.com/mkr056/Habit-Tracking-App.git**
 2. Make sure Python version 3.7 or later is installed on your machine, otherwise download it: **https://www.python.org/downloads/**
 3. Open Terminal (Command Prompt) and navigate to the project folder
 4. Install external Python packages: **pip install -r packages.txt**
