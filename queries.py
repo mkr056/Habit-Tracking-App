@@ -32,7 +32,7 @@ check = '''
         WHEN periodicity = 'daily' AND (strftime('%s', 'now') - strftime('%s', latest_completion) <= 86400 OR latest_completion IS NULL) THEN current_streak + 1
         WHEN periodicity = 'weekly' AND (strftime('%s', 'now') - strftime('%s', latest_completion) <= 604800 OR latest_completion IS NULL) THEN current_streak + 1
         ELSE 0
-        END, latest_completion = datetime('now') WHERE id = ?;
+        END, latest_completion = datetime('now') WHERE id = ?
 '''
 
 delete = 'DELETE FROM Habit WHERE id = ?'
@@ -61,5 +61,5 @@ validate_streak = '''
         WHEN periodicity = 'daily' AND (strftime('%s', 'now') - strftime('%s', latest_completion) <= 86400 OR latest_completion IS NULL) THEN current_streak
         WHEN periodicity = 'weekly' AND (strftime('%s', 'now') - strftime('%s', latest_completion) <= 604800 OR latest_completion IS NULL) THEN current_streak
         ELSE 0
-        END;
+        END
 '''

@@ -38,6 +38,7 @@ def prompt_user():
     Connect to database -> execute setup sql queries -> execute application processes
     :return: JSON with status code
     """
+    print("Application has been launched!")
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
     cursor.execute(queries.create)
@@ -71,7 +72,7 @@ def create():
     habit_data = json.loads(data)
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
-    cursor.execute(queries.insert, (habit_data['title'], habit_data['periodicity']))
+    cursor.execute(queries.insert, [habit_data['title'], habit_data['periodicity']])
     connection.commit()
     connection.close()
     return jsonify({'success': True}), 200
@@ -89,7 +90,7 @@ def update(habit_id):
     habit_data = json.loads(data)
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
-    cursor.execute(queries.update, (habit_data.get('title'), habit_data.get('periodicity'), habit_id))
+    cursor.execute(queries.update, [habit_data.get('title'), habit_data.get('periodicity'), habit_id])
     connection.commit()
     connection.close()
     return jsonify({'success': True}), 200
@@ -104,7 +105,7 @@ def delete(habit_id):
     """
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
-    cursor.execute(queries.delete, habit_id)
+    cursor.execute(queries.delete, [habit_id])
     connection.commit()
     connection.close()
     return jsonify({'success': True}), 200
@@ -119,7 +120,7 @@ def check(habit_id):
     """
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
-    cursor.execute(queries.check, habit_id)
+    cursor.execute(queries.check, [habit_id])
     connection.commit()
     connection.close()
     return jsonify({'success': True}), 200
@@ -154,7 +155,7 @@ def get_longest_streak():
     cursor.execute(queries.validate_streak)
     # if habit id was found in query parameters then get habit's longest streak, otherwise get the longest among all habits
     if habit_id:
-        cursor.execute(queries.get_longest_streak_id, habit_id)
+        cursor.execute(queries.get_longest_streak_id, [habit_id])
     else:
         cursor.execute(queries.get_longest_streak_all)
     longest_streak = cursor.fetchall()
@@ -168,7 +169,7 @@ def handle_exit():
     Sends an interrupt signal to the current Python process (is called when exit command is received)
     """
     os.kill(os.getpid(), signal.SIGINT)
-    print("Application has been terminated.")
+    print("Application has been terminated!")
 
 
 # a dictionary of all available commands as keys and corresponding handlers as values
