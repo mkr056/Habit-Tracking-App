@@ -1,186 +1,86 @@
-import json
-import logging
-import os
-import signal
-import sqlite3
-
-from flask import Flask, request, jsonify
-from flask_json_schema import JsonSchema, JsonValidationError
-
-import helpers
-import queries
-from commands.check import check_habit
+import db
+import common
+import random
+from datetime import datetime, timedelta
+from Habit import Habit
 from commands.create import create_habit
+from commands.check import check_habit
+from commands.update import update_habit
 from commands.delete import delete_habit
 from commands.info import get_habit_info
-from commands.update import update_habit
-from common import create_schema, update_schema
-from config import *
-
-app = Flask(__name__)
-logging.getLogger("werkzeug").disabled = True  # disables log info
-schema = JsonSchema(app)
+from commands.exit import handle_exit
 
 
-@app.errorhandler(JsonValidationError)
-def validation_error(e):
+def create_example_data():
     """
-    Handler when an error occurs while validating against json schema
-    :param e: Error
-    :return: JSON
+    Function to create example data in the database
     """
-    return jsonify({'error': e.message, 'errors': [validation_error.message for validation_error in e.errors]})
+    # create 5 example habits with random periodicity and random completion_dates
+    for i in range(1, 6):
+        habit_title = f"test{i}"
+        periodicity = random.choice(list(['daily', 'weekly']))  # randomly selected periodicity of the habit
+        completion_dates = []
+        start_date = datetime.now() - timedelta(weeks=4)  # get timestamp from 4 weeks ago
+
+        # generate timestamps for each day/week over the past 4 weeks with a 70% chance of adding a timestamp.
+        # for daily periodicity 28 entries are required and for weekly 4 entries
+        for j in range(28 if periodicity == 'daily' else 4):
+            if random.random() < 0.7:  # there is a 30 percent chance of skipping habit completion
+                completion_dates.append(start_date.strftime(common.DATETIME_FORMAT))
+            # skip to the next day or week depending on the periodicity
+            start_date += common.time_difference[periodicity]
+        # once all the data is formed, create instance and add a new entry to the database
+        new_habit = Habit(title=habit_title, periodicity=periodicity, completion_dates=",".join(completion_dates))
+        new_habit.create()
 
 
-@app.route('/')
+def refresh_streaks():
+    """
+    Function to refresh current and longest streak for all habits in the database
+    """
+    db_habits = db.get_habits(('all', 'all'))  # get all habits in the database
+    # iterate over habits creating corresponding instances based on db data and refreshing streak values for each habit
+    for item in db_habits:
+        habit_id = item[0]
+        periodicity = item[2]
+        completion_dates = item[4]
+        habit = Habit(periodicity=periodicity, completion_dates=completion_dates)
+        habit.refresh_streak(habit_id)
+
+
 def prompt_user():
     """
-    Connect to database -> execute setup sql queries -> execute application processes
-    :return: JSON with status code
+    Main function to interact with the user and handle commands
     """
     print("Application has been launched!")
-    connection = sqlite3.connect(DB_NAME)
-    cursor = connection.cursor()
-    cursor.execute(queries.create)
-    cursor.execute(queries.create_trigger)
-    cursor.execute(queries.insert_predefined_habits)
-    connection.commit()
-    connection.close()
+    db.setup_table()  # create table in the database if it does not exist
+    db_habits = db.get_habits(('all', 'all'))  # get all habits in the database
+    # if there are no habits in the database, then insert example data
+    if not db_habits:
+        create_example_data()
+    # repeat this code until the app is not terminated by the exit command handler
     while True:
-        command = input("Enter a command (create/check/update/delete/info/exit): ")
-        prepared_command = helpers.prepare_string(command)
-        command_handler = commands.get(prepared_command)  # get function based on key (command)
-        # if function exists then call it, otherwise print message and start new loop iteration
+        refresh_streaks()  # refresh current and longest streaks for all habit before executing command handlers
+        command = input("Enter a command (create/check/update/delete/info/exit): ")  # get command from user
+        prepared_command = common.prepare_string(command)  # prepare user command for accessing the handler function
+        command_handler = commands.get(prepared_command)  # get handler based on key (command)
+        # if handler exists then call it, otherwise print message and start new loop iteration
         if command_handler:
             command_handler()
         else:
             print("Invalid command.")
             continue
-        if prepared_command == 'exit':  # if exit command is received then exit the infinite loop
-            break
-    return jsonify({'success': True}), 200
 
 
-@app.route('/create', methods=['POST'])
-@schema.validate(create_schema)  # validate against json schema
-def create():
-    """
-    Crates a new habit in the database
-    :return: JSON with status code
-    """
-    data = request.get_json()
-    habit_data = json.loads(data)
-    connection = sqlite3.connect(DB_NAME)
-    cursor = connection.cursor()
-    cursor.execute(queries.insert, [habit_data['title'], habit_data['periodicity']])
-    connection.commit()
-    connection.close()
-    return jsonify({'success': True}), 200
-
-
-@app.route('/<habit_id>/update', methods=['POST'])
-@schema.validate(update_schema)  # validate against json schema
-def update(habit_id):
-    """
-    Updates a habit in the database (either habit name, periodicity or both) based on its id
-    :param habit_id: is received from the url
-    :return: JSON with status code
-    """
-    data = request.get_json()
-    habit_data = json.loads(data)
-    connection = sqlite3.connect(DB_NAME)
-    cursor = connection.cursor()
-    cursor.execute(queries.update, [habit_data.get('title'), habit_data.get('periodicity'), habit_id])
-    connection.commit()
-    connection.close()
-    return jsonify({'success': True}), 200
-
-
-@app.route('/<habit_id>/delete', methods=['POST'])
-def delete(habit_id):
-    """
-    Deletes a habit from the database based on its id
-    :param habit_id: is received from the url
-    :return: JSON with status code
-    """
-    connection = sqlite3.connect(DB_NAME)
-    cursor = connection.cursor()
-    cursor.execute(queries.delete, [habit_id])
-    connection.commit()
-    connection.close()
-    return jsonify({'success': True}), 200
-
-
-@app.route('/<habit_id>/check', methods=['POST'])
-def check(habit_id):
-    """
-    Checks/completes habit in the database based on its id
-    :param habit_id: is received from the url
-    :return: JSON with status code
-    """
-    connection = sqlite3.connect(DB_NAME)
-    cursor = connection.cursor()
-    cursor.execute(queries.check, [habit_id])
-    connection.commit()
-    connection.close()
-    return jsonify({'success': True}), 200
-
-
-@app.route('/habits', methods=['GET'])
-def get_habits():
-    """
-    Gets all habits from the database with optional filter based on periodicity received from query parameters
-    :return: habits represented as JSON with status code
-    """
-    periodicity = request.args.get('periodicity')
-    connection = sqlite3.connect(DB_NAME)
-    cursor = connection.cursor()
-    cursor.execute(queries.validate_streak)
-    cursor.execute(queries.get_habits, [periodicity, periodicity])
-    habits = cursor.fetchall()
-    connection.commit()
-    connection.close()
-    return jsonify({'habits': habits}), 200
-
-
-@app.route('/streak', methods=['GET'])
-def get_longest_streak():
-    """
-    Gets the longest streak either among all habits or for individual habit based on id received from query parameters
-    :return: longest streak response as JSON with status code
-    """
-    habit_id = request.args.get('id')
-    connection = sqlite3.connect(DB_NAME)
-    cursor = connection.cursor()
-    cursor.execute(queries.validate_streak)
-    # if habit id was found in query parameters then get habit's longest streak, otherwise get the longest among all habits
-    if habit_id:
-        cursor.execute(queries.get_longest_streak_id, [habit_id])
-    else:
-        cursor.execute(queries.get_longest_streak_all)
-    longest_streak = cursor.fetchall()
-    connection.commit()
-    connection.close()
-    return jsonify({'longest_streak': longest_streak}), 200
-
-
-def handle_exit():
-    """
-    Sends an interrupt signal to the current Python process (is called when exit command is received)
-    """
-    os.kill(os.getpid(), signal.SIGINT)
-    print("Application has been terminated!")
-
-
-# a dictionary of all available commands as keys and corresponding handlers as values
+# dictionary of all available commands as keys and corresponding handlers as values
 commands = {
     'create': create_habit,
+    'check': check_habit,
     'update': update_habit,
     'delete': delete_habit,
-    'check': check_habit,
     'info': get_habit_info,
     'exit': handle_exit
 }
 
 if __name__ == '__main__':
-    app.run(port=PORT, debug=True)  # start the development server
+    prompt_user()

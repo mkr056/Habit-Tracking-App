@@ -1,12 +1,12 @@
-import requests
-from helpers import check_is_number, get_habits, prepare_string, get_id, check_existing_id
-from config import URL
+import db
+from Habit import Habit
 from common import periodicities
+from common import check_is_number, prepare_string, get_id
 
 
 def get_option():
     """
-    Gets periodicity option (for optional filtering) from the user and checks if it is one of the possible values
+    Function to get periodicity option (for optional filtering) from the user and check if it is one of the possible values
     :return: prepared periodicity option
     """
     options = periodicities + ['all']  # add 'all' option to the list of possible periodicities
@@ -23,61 +23,50 @@ def get_option():
 
 def get_list():
     """
-    Gets all habits from the database optionally filtered by periodicity
+    Function to get all habits from the database optionally filtered by periodicity
     :return: formatted habit list (id and title)
     """
     option = get_option()  # get filter option from the user
-    habits = get_habits(option)  # get all habits from the database with specified periodicity
+    db_habits = db.get_habits((option, option))  # get all habits from the database with specified periodicity
     result = ""
     # iterate over all retrieved habits and format result in format 'habit id, title'
-    for item in habits:
+    for item in db_habits:
         habit_id = item[0]
         title = item[1]
         result += f"id: {habit_id}, title: {title}\n"
-    print(result)
+    print(result) if result else print('No habits found.')
 
 
 def get_longest_streak_all():
     """
-    Gets the longest streak among all habits
-    :return: formatted the longest streak
+    Function to get the longest streak among all habits
+    :return: formatted longest streak
     """
-    response = requests.get(f'{URL}/streak')  # send request
-    data = response.json()  # get JSON data from response
-    longest_streak = data.get('longest_streak')  # get the longest streak (represented as list of lists containing row data)
-    result = ""
-    # format result
-    for item in longest_streak:
-        value = item[0]
-        result += f"Longest streak: {value}"
-    print(result)
+    longest_streak = db.get_longest_streak_all()  # get the longest streak (represented as list of lists containing row data)
+    print(f"Longest streak: {longest_streak[0]}")
 
 
 def get_longest_streak_id():
     """
-    Gets the longest streak of specified habit
-    :return: formatted the longest streak
+    Function to get the longest streak of specified habit
+    :return: formatted longest streak
     """
     habit_id = get_id()  # get habit id from the user
-    habits = get_habits()  # get all habits in the database
-    is_existing_id = check_existing_id(habits, habit_id)  # check if received id exists in the database
+    query_parameters = (habit_id,)
+    db_habit = db.get_habit(query_parameters)
     # if id exists then send request, get JSON data from response and format result, otherwise print error message
-    if is_existing_id:
-        response = requests.get(f'{URL}/streak?id={habit_id}')
-        data = response.json()
-        longest_streak = data.get('longest_streak')
-        result = ""
-        for item in longest_streak:
-            value = item[0]
-            result += f"Longest streak: {value}"
-        print(result)
+    if db_habit:
+        habit = Habit(longest_streak=db_habit[6])
+        longest_streak = habit.get_longest_streak()  # get the longest streak (represented as list of lists containing row data)
+        print(f"Longest streak: {longest_streak}")
     else:
         print("Habit id does not exist.")
+        get_longest_streak_id()
 
 
 def get_habit_info():
     """
-    Gets command number from the user and calls the corresponding handler
+    Function to get command number from the user and call the corresponding handler
     :return: message to the user
     """
     prompt_text = ("1 - return a list of currently tracked habits\n"
